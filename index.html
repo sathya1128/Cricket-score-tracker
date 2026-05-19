@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SathyaScores | Advanced Cricket Scoring</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        cricDark: '#0B0E14',
+                        cricCard: '#151A23',
+                        cricNeonGreen: '#00FF66',
+                        cricNeonBlue: '#00E5FF',
+                        cricAccent: '#1F2937',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css">
+    
+    <!-- Icons (Lucide) & Confetti -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-cricDark text-white font-sans antialiased min-h-screen flex flex-col overflow-x-hidden selection:bg-cricNeonBlue selection:text-cricDark">
+    
+    <!-- Animated Background -->
+    <div class="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div class="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-cricNeonBlue/5 blur-[120px] animate-pulse-slow"></div>
+        <div class="absolute top-[60%] -right-[10%] w-[60%] h-[60%] rounded-full bg-cricNeonGreen/5 blur-[120px] animate-pulse-slow delay-1000"></div>
+    </div>
+
+    <!-- Match Result Modal (Hidden by default) -->
+    <div id="result-modal" class="fixed inset-0 z-[200] hidden flex flex-col items-center justify-center bg-cricDark/95 backdrop-blur-md p-4 overflow-hidden">
+        <!-- Result Content -->
+        <div class="relative z-10 flex flex-col items-center text-center animate-bounce-in">
+            <i data-lucide="trophy" class="w-24 h-24 text-yellow-400 mb-6 drop-shadow-[0_0_20px_rgba(250,204,21,0.6)]"></i>
+            <h1 class="text-3xl md:text-5xl font-bold text-gray-300 mb-2">MATCH OVER</h1>
+            <h2 id="result-text" class="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cricNeonBlue to-cricNeonGreen py-4 drop-shadow-[0_0_30px_rgba(0,255,102,0.4)]">
+                Team A Won!
+            </h2>
+            <p id="result-subtext" class="text-xl text-gray-400 mt-4">By 5 runs</p>
+            
+            <button onclick="location.reload()" class="mt-12 px-8 py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg border border-white/20 transition-all active:scale-95 flex items-center gap-2">
+                <i data-lucide="rotate-ccw"></i> Start New Match
+            </button>
+        </div>
+    </div>
+
+    <!-- Match Setup Modal -->
+    <div id="setup-modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card rounded-2xl w-full max-w-5xl max-h-[95vh] flex flex-col border border-white/10 shadow-2xl relative overflow-hidden">
+            <!-- Decorative accent -->
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cricNeonBlue to-cricNeonGreen"></div>
+            
+            <div class="p-6 border-b border-white/10 shrink-0">
+                <h2 class="text-2xl font-bold flex items-center gap-2">
+                    <i data-lucide="settings-2" class="text-cricNeonBlue"></i> Match Setup
+                </h2>
+                <p class="text-sm text-gray-400 mt-1">Configure teams, toss details, and playing squads.</p>
+            </div>
+            
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                <form id="setup-form" class="space-y-8">
+                    
+                    <!-- 1. Match Details -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Match/Tournament Title</label>
+                            <input type="text" id="setup-title" value="Local Weekend Tournament" class="w-full bg-cricAccent border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cricNeonBlue transition-colors" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">Total Overs</label>
+                            <input type="number" id="setup-overs" value="20" min="1" class="w-full bg-cricAccent border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cricNeonBlue transition-colors" required>
+                        </div>
+                    </div>
+
+                    <hr class="border-white/5">
+
+                    <!-- 2. Team Squads -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        
+                        <!-- Team A -->
+                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                            <label class="block text-sm text-gray-400 mb-1">Team A Name</label>
+                            <input type="text" id="team-a-name" value="Team A" class="w-full bg-cricDark border border-white/10 rounded-lg px-4 py-2 mb-4 text-white focus:outline-none focus:border-cricNeonBlue transition-colors team-name-input" required>
+                            
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm text-gray-400">Team A Squad</label>
+                                <button type="button" id="btn-add-player-a" class="text-xs text-cricNeonBlue hover:text-white transition-colors flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3 h-3"></i> Add Player
+                                </button>
+                            </div>
+                            <div id="team-a-squad" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                <input type="text" placeholder="Player 1" class="squad-input-a w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeonBlue">
+                                <input type="text" placeholder="Player 2" class="squad-input-a w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeonBlue">
+                                <input type="text" placeholder="Player 3" class="squad-input-a w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeonBlue">
+                            </div>
+                        </div>
+
+                        <!-- Team B -->
+                        <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                            <label class="block text-sm text-gray-400 mb-1">Team B Name</label>
+                            <input type="text" id="team-b-name" value="Team B" class="w-full bg-cricDark border border-white/10 rounded-lg px-4 py-2 mb-4 text-white focus:outline-none focus:border-cricNeonGreen transition-colors team-name-input" required>
+                            
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-sm text-gray-400">Team B Squad</label>
+                                <button type="button" id="btn-add-player-b" class="text-xs text-cricNeonGreen hover:text-white transition-colors flex items-center gap-1">
+                                    <i data-lucide="plus" class="w-3 h-3"></i> Add Player
+                                </button>
+                            </div>
+                            <div id="team-b-squad" class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                <input type="text" placeholder="Player 1" class="squad-input-b w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeonGreen">
+                                <input type="text" placeholder="Player 2" class="squad-input-b w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeonGreen">
+                                <input type="text" placeholder="Player 3" class="squad-input-b w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeonGreen">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-white/5">
+
+                    <!-- 3. Toss -->
+                    <div class="bg-cricAccent/50 p-4 rounded-xl border border-white/5 mb-6">
+                        <label class="block text-sm text-gray-400 mb-3">Toss Details</label>
+                        <div class="mb-3">
+                            <span class="text-xs text-gray-500 block mb-1">Toss Won By:</span>
+                            <div class="flex gap-4">
+                                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input type="radio" name="toss-winner" value="A" class="toss-trigger accent-cricNeonBlue" checked> <span id="lbl-toss-a">Team A</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input type="radio" name="toss-winner" value="B" class="toss-trigger accent-cricNeonGreen"> <span id="lbl-toss-b">Team B</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500 block mb-1">Decided To:</span>
+                            <div class="flex gap-4">
+                                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input type="radio" name="toss-decision" value="bat" class="toss-trigger accent-cricNeonBlue" checked> Bat
+                                </label>
+                                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                                    <input type="radio" name="toss-decision" value="bowl" class="toss-trigger accent-cricNeonGreen"> Bowl
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-white/5">
+
+                    <!-- 4. Opening Players -->
+                    <div class="bg-cricAccent/30 p-4 rounded-xl border border-white/5">
+                        <label class="block text-sm font-semibold text-cricNeonBlue mb-3">Opening Players</label>
+                        <p class="text-xs text-gray-400 mb-4">Players will auto-populate as you enter squads above.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Striker</label>
+                                <select id="setup-striker" class="w-full bg-cricDark border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cricNeonBlue transition-colors" required>
+                                    <option value="" disabled selected>Select Striker</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Non-Striker</label>
+                                <select id="setup-nonstriker" class="w-full bg-cricDark border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cricNeonBlue transition-colors" required>
+                                    <option value="" disabled selected>Select Non-Striker</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-400 mb-1">Opening Bowler</label>
+                                <select id="setup-bowler" class="w-full bg-cricDark border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cricNeonBlue transition-colors" required>
+                                    <option value="" disabled selected>Select Bowler</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+            
+            <div class="p-6 border-t border-white/10 shrink-0 bg-cricCard">
+                <button type="submit" form="setup-form" class="w-full py-4 rounded-xl bg-gradient-to-r from-cricNeonBlue to-cricNeonGreen text-cricDark font-bold text-lg hover:shadow-[0_0_20px_rgba(0,229,255,0.4)] transition-all active:scale-[0.98]">
+                    Start Match
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- In-Game Selection Modal (For Wickets & Overs) -->
+    <div id="selection-modal" class="fixed inset-0 z-[150] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass-card rounded-2xl w-full max-w-sm p-6 border border-white/10 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-cricNeonBlue"></div>
+            <h2 id="selection-title" class="text-xl font-bold mb-4 text-white">Select Player</h2>
+            <select id="selection-dropdown" class="w-full bg-cricDark border border-white/10 rounded-lg px-3 py-3 text-white focus:outline-none focus:border-cricNeonBlue mb-6">
+                <!-- Populated dynamically -->
+            </select>
+            <button id="btn-confirm-selection" class="w-full py-3 rounded-xl bg-cricNeonBlue text-cricDark font-bold text-lg hover:shadow-[0_0_15px_rgba(0,229,255,0.4)] transition-all active:scale-[0.98]">
+                Confirm
+            </button>
+        </div>
+    </div>
+
+    <!-- Target Modal (Between Innings) -->
+    <div id="target-modal" class="fixed inset-0 z-[175] hidden flex flex-col items-center justify-center bg-cricDark/95 backdrop-blur-md p-4 overflow-hidden">
+        <div class="relative z-10 flex flex-col items-center text-center animate-bounce-in">
+            <h1 class="text-3xl md:text-5xl font-bold text-gray-300 mb-2">1st Innings Over!</h1>
+            <h2 class="text-6xl md:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cricNeonBlue to-cricNeonGreen py-4 drop-shadow-[0_0_30px_rgba(0,255,102,0.4)]">
+                TARGET: <span id="target-score-display">0</span>
+            </h2>
+            <p id="target-equation-display" class="text-xl text-gray-400 mt-4">Team B needs 150 runs to win</p>
+            
+            <button id="btn-start-second-innings" class="mt-12 px-8 py-4 rounded-xl bg-cricNeonBlue text-cricDark font-bold text-lg hover:shadow-[0_0_20px_rgba(0,229,255,0.6)] transition-all active:scale-95 flex items-center gap-2">
+                <i data-lucide="play"></i> Start 2nd Innings
+            </button>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="glass-nav sticky top-0 z-50 px-6 py-4 border-b border-white/5">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3 cursor-pointer group">
+                <div class="w-11 h-11 rounded-xl bg-cricDark flex items-center justify-center shadow-[0_0_15px_rgba(0,255,102,0.3)] group-hover:shadow-[0_0_25px_rgba(0,229,255,0.5)] transition-all duration-300 overflow-hidden border border-white/10">
+                    <img src="assets/cricket_logo.png" alt="SathyaScores Logo" class="w-full h-full object-cover scale-110">
+                </div>
+                <h1 class="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Sathya<span class="text-cricNeonGreen">Scores</span></h1>
+            </div>
+            
+            <div class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-300">
+                <a href="#" class="hover:text-cricNeonBlue transition-colors active-nav">Live Match</a>
+                <a href="#" id="nav-new-match" class="hover:text-cricNeonBlue transition-colors">New Match</a>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <div class="w-9 h-9 rounded-full bg-cricAccent border border-white/10 overflow-hidden cursor-pointer">
+                    <img src="https://ui-avatars.com/api/?name=Scorer&background=1F2937&color=00FF66" alt="User">
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-grow z-10 relative max-w-7xl mx-auto w-full px-4 sm:px-6 py-8 flex flex-col lg:grid lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- 1. Match Header (Left Top on Desktop, Top on Mobile) -->
+        <div class="w-full lg:col-span-8 order-1 lg:order-1 glass-card rounded-2xl p-6 relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-3 bg-red-500/10 rounded-bl-xl border-b border-l border-red-500/20">
+                <span class="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-wider">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span> Live
+                </span>
+            </div>
+            
+            <div class="text-sm text-gray-400 mb-2 flex items-center gap-2">
+                <i data-lucide="trophy" class="w-4 h-4 text-cricNeonBlue"></i>
+                <span id="ui-match-title">Loading...</span>
+            </div>
+            
+            <div class="text-xs text-cricNeonGreen mb-4 font-medium" id="ui-toss-info">
+                Toss details loading...
+            </div>
+
+            <div class="flex items-center justify-between">
+                <!-- Team 1 (Bowling/Fielding) -->
+                <div class="flex flex-col items-center gap-3">
+                    <div id="ui-bowl-team-badge" class="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(37,99,235,0.5)] border-2 border-white/10 text-center text-[10px] leading-tight px-1">
+                        TBA
+                    </div>
+                    <div class="text-center" id="ui-bowl-team-info">
+                        <h2 class="text-sm font-bold text-gray-500 uppercase">Fielding</h2>
+                    </div>
+                </div>
+                
+                <!-- VS -->
+                <div class="flex flex-col items-center">
+                    <div class="text-sm font-medium text-gray-500 mb-2" id="ui-target-badge">1st Innings</div>
+                    <div class="px-4 py-1 rounded-full bg-cricAccent text-xs font-bold text-gray-300 border border-white/5">VS</div>
+                </div>
+
+                <!-- Team 2 (Batting) -->
+                <div class="flex flex-col items-center gap-3">
+                    <div id="ui-bat-team-badge" class="w-16 h-16 rounded-full bg-green-600 flex items-center justify-center text-xl font-bold shadow-[0_0_15px_rgba(22,163,74,0.5)] border-2 border-white/10 relative text-center text-[10px] leading-tight px-1">
+                        TBA
+                        <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-cricNeonGreen rounded-full border-2 border-cricCard"></div>
+                    </div>
+                    <div class="text-center">
+                        <h2 class="text-3xl font-bold text-cricNeonGreen tracking-wider" id="current-score">0/0</h2>
+                        <p class="text-sm text-gray-400 font-medium mt-1" id="current-overs">0.0 overs</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 pt-4 border-t border-white/10 text-center">
+                <p class="text-sm font-medium text-cricNeonBlue" id="match-equation">Match starting soon...</p>
+                <div class="flex justify-center gap-6 mt-2 text-xs text-gray-400">
+                    <span>CRR: <strong class="text-white" id="crr">0.00</strong></span>
+                    <span id="req-container" class="hidden">REQ: <strong class="text-white" id="req">0.00</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Scoring Controls (Right Column on Desktop, SECOND on Mobile) -->
+        <div class="w-full lg:col-span-4 order-2 lg:order-2 lg:row-span-4 flex flex-col gap-6 self-stretch">
+            
+            <div class="glass-card rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-lg font-bold flex items-center gap-2">
+                        <i data-lucide="edit-3" class="w-5 h-5 text-cricNeonBlue"></i> Scoring Panel
+                    </h3>
+                    <button id="btn-undo" class="text-xs px-3 py-1.5 rounded bg-cricAccent hover:bg-white/10 transition-colors border border-white/5 flex items-center gap-1">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Undo
+                    </button>
+                </div>
+
+                <!-- Runs -->
+                <div class="grid grid-cols-3 gap-3 mb-6">
+                    <button class="score-btn" data-runs="0">0</button>
+                    <button class="score-btn" data-runs="1">1</button>
+                    <button class="score-btn" data-runs="2">2</button>
+                    <button class="score-btn" data-runs="3">3</button>
+                    <button class="score-btn boundary-btn text-cricNeonBlue" data-runs="4">4</button>
+                    <button class="score-btn boundary-btn text-cricNeonGreen" data-runs="6">6</button>
+                </div>
+
+                <!-- Extras & Wicket -->
+                <div class="grid grid-cols-2 gap-3 mb-6">
+                    <button class="extra-btn" data-extra="wide">Wide</button>
+                    <button class="extra-btn" data-extra="noball">No Ball</button>
+                    <button class="extra-btn" data-extra="bye">Bye</button>
+                    <button class="extra-btn" data-extra="legbye">Leg Bye</button>
+                </div>
+                
+                <button class="w-full py-4 rounded-xl bg-red-500/20 text-red-500 font-bold border border-red-500/30 hover:bg-red-500/30 transition-all hover:shadow-[0_0_15px_rgba(239,68,68,0.3)] active:scale-[0.98]" data-wicket="true">
+                    WICKET
+                </button>
+            </div>
+            
+            <!-- Match Events Log -->
+            <div class="glass-card rounded-2xl p-5 flex-grow flex flex-col min-h-[300px]">
+                <h3 class="text-sm font-semibold text-gray-400 mb-4">Match Events</h3>
+                <div class="flex-grow overflow-y-auto space-y-3 pr-2 custom-scrollbar" id="match-events">
+                    <!-- Events here -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 3. Batting & Bowling Stats (Left Middle on Desktop, Third on Mobile) -->
+        <div class="w-full lg:col-span-8 order-3 lg:order-3 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Batting -->
+            <div class="glass-card rounded-2xl p-5">
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex justify-between">
+                    <span>Batters</span>
+                    <span>R (B) SR</span>
+                </h3>
+                <div class="flex flex-col gap-3" id="batters-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Bowling -->
+            <div class="glass-card rounded-2xl p-5">
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 flex justify-between">
+                    <span>Bowler</span>
+                    <span>O-M-R-W ECO</span>
+                </h3>
+                <div class="flex flex-col gap-3" id="bowlers-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 4. Recent Balls (Left Bottom on Desktop, Fourth on Mobile) -->
+        <div class="w-full lg:col-span-8 order-4 lg:order-4 glass-card rounded-2xl p-5">
+            <h3 class="text-sm font-semibold text-gray-400 mb-3">Recent Balls</h3>
+            <div class="flex flex-wrap gap-2 items-center" id="recent-balls">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Full Scorecard Section -->
+    <section class="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-8">
+        <div class="glass-card rounded-2xl p-6">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4 border-b border-white/10 pb-4">
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <i data-lucide="bar-chart-2" class="text-cricNeonBlue"></i> Full Scorecard
+                </h2>
+                <!-- Tabs -->
+                <div class="flex bg-cricDark p-1 rounded-lg border border-white/5" id="scorecard-tabs">
+                    <button class="px-4 py-1.5 rounded-md text-sm font-bold bg-white/10 text-white transition-colors" data-inning="1" id="tab-inning-1">1st Innings</button>
+                    <button class="px-4 py-1.5 rounded-md text-sm font-bold text-gray-500 hover:text-white transition-colors opacity-50 cursor-not-allowed" data-inning="2" id="tab-inning-2" disabled>2nd Innings</button>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Full Batting Card -->
+                <div>
+                    <h3 class="text-sm font-semibold text-cricNeonGreen uppercase tracking-wider mb-4">Batting</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-gray-400 text-xs">
+                                <tr>
+                                    <th class="py-2 font-medium">Batter</th>
+                                    <th class="py-2 font-medium text-center">R</th>
+                                    <th class="py-2 font-medium text-center">B</th>
+                                    <th class="py-2 font-medium text-center">4s</th>
+                                    <th class="py-2 font-medium text-center">6s</th>
+                                    <th class="py-2 font-medium text-right">SR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="full-batting-card" class="divide-y divide-white/5 text-gray-300">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Full Bowling Card -->
+                <div>
+                    <h3 class="text-sm font-semibold text-cricNeonBlue uppercase tracking-wider mb-4">Bowling</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-gray-400 text-xs">
+                                <tr>
+                                    <th class="py-2 font-medium">Bowler</th>
+                                    <th class="py-2 font-medium text-center">O</th>
+                                    <th class="py-2 font-medium text-center">M</th>
+                                    <th class="py-2 font-medium text-center">R</th>
+                                    <th class="py-2 font-medium text-center">W</th>
+                                    <th class="py-2 font-medium text-right">ECON</th>
+                                </tr>
+                            </thead>
+                            <tbody id="full-bowling-card" class="divide-y divide-white/5 text-gray-300">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
