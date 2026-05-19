@@ -1261,8 +1261,9 @@ async function scoreBall(runs, extra = null, isWicket = false) {
         const currentBowlerName = bwl.name;
         const currentStrikerName = striker.name;
 
-        // Save to history for undo (Deep clone simple state)
-        const eventState = JSON.parse(JSON.stringify(matchState));
+        // Save to history for undo (Deep clone simple state, exclude history to prevent exponential memory leak)
+        const stateToClone = { ...matchState, history: [] };
+        const eventState = JSON.parse(JSON.stringify(stateToClone));
 
         let ballIsLegal = true;
         if (extra === 'wide' || extra === 'noball') {
@@ -1397,7 +1398,9 @@ function undoLastBall() {
     
     const lastEvent = matchState.history.pop();
     if (lastEvent.previousState) {
-        matchState = lastEvent.previousState;
+        const restoredState = lastEvent.previousState;
+        restoredState.history = matchState.history; // Restore the current history array
+        matchState = restoredState;
         els.matchEvents.removeChild(els.matchEvents.firstElementChild); // Remove event log
         updateUI();
     }
