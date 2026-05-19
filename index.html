@@ -33,7 +33,104 @@
     </script>
     
     <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/styles.css">
+    <style>
+/* Custom Utilities and Animations */
+
+.glass-nav {
+    background: rgba(11, 14, 20, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-card {
+    background: rgba(21, 26, 35, 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Scoring Buttons */
+.score-btn {
+    @apply py-4 rounded-xl bg-cricAccent font-bold text-lg border border-white/5 hover:bg-white/10 transition-all active:scale-95 text-white;
+}
+.score-btn.boundary-btn {
+    @apply text-xl shadow-[0_0_10px_rgba(255,255,255,0.05)];
+}
+.extra-btn {
+    @apply py-3 rounded-xl bg-cricAccent text-sm font-medium border border-white/5 hover:bg-white/10 transition-all active:scale-95 text-gray-300;
+}
+
+/* Animations */
+@keyframes pulse-slow {
+    0%, 100% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.05); }
+}
+.animate-pulse-slow {
+    animation: pulse-slow 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Run Badge Animations */
+@keyframes pop-in {
+    0% { transform: scale(0); opacity: 0; }
+    80% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+}
+.ball-badge {
+    animation: pop-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0;
+}
+.ball-dot { @apply bg-gray-700 text-gray-300; }
+.ball-run { @apply bg-gray-600 text-white; }
+.ball-four { @apply bg-cricNeonBlue text-cricDark shadow-[0_0_10px_rgba(0,229,255,0.5)]; }
+.ball-six { @apply bg-cricNeonGreen text-cricDark shadow-[0_0_10px_rgba(0,255,102,0.5)]; }
+.ball-wicket { @apply bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.5)]; }
+.ball-extra { @apply bg-yellow-600 text-white; }
+
+/* Match Event List Item Animation */
+@keyframes slide-in-right {
+    0% { opacity: 0; transform: translateX(20px); }
+    100% { opacity: 1; transform: translateX(0); }
+}
+.event-item {
+    animation: slide-in-right 0.3s ease-out forwards;
+}
+
+/* Active Nav Indicator */
+.active-nav {
+    position: relative;
+    @apply text-white;
+}
+.active-nav::after {
+    content: '';
+    position: absolute;
+    bottom: -1.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 3px;
+    background: #00E5FF;
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 -2px 10px rgba(0, 229, 255, 0.5);
+}
+
+</style>
     
     <!-- Icons (Lucide) & Confetti -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -232,7 +329,7 @@
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3 cursor-pointer group">
                 <div class="w-11 h-11 rounded-xl bg-cricDark flex items-center justify-center shadow-[0_0_15px_rgba(0,255,102,0.3)] group-hover:shadow-[0_0_25px_rgba(0,229,255,0.5)] transition-all duration-300 overflow-hidden border border-white/10">
-                    <img src="assets/cricket_logo.png" alt="SathyaScores Logo" class="w-full h-full object-cover scale-110">
+                    <img src="assets/cricket_logo.png" alt="SathyaScores Logo" class="w-full h-full object-cover scale-110" onerror="this.outerHTML='<span class=\'text-cricNeonGreen font-bold text-xl\'>S</span>'">
                 </div>
                 <h1 class="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">Sathya<span class="text-cricNeonGreen">Scores</span></h1>
             </div>
@@ -452,6 +549,882 @@
         </div>
     </section>
 
-    <script src="js/app.js"></script>
+    <script>
+// Initialize Icons
+if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+}
+
+// Match State
+let matchState = {
+    title: "",
+    tossString: "",
+    batTeam: "",
+    bowlTeam: "",
+    batSquad: [],
+    bowlSquad: [],
+    target: 0,
+    totalBalls: 120,
+    currentInnings: {
+        runs: 0,
+        wickets: 0,
+        balls: 0,
+        outBatters: [],
+        battingCard: {}, // { name: { runs, balls, fours, sixes, outStatus } }
+        bowlingCard: {}  // { name: { runs, wickets, balls, maidens } }
+    },
+    firstInningsData: null, // to store 1st innings card data
+    batters: [],
+    bowler: null,
+    history: []
+};
+
+let activeScorecardTab = 1;
+let isProcessingBall = false;
+
+// DOM Elements
+const els = {
+    modal: document.getElementById('setup-modal'),
+    form: document.getElementById('setup-form'),
+    btnNewMatch: document.getElementById('nav-new-match'),
+    
+    // Setup Form Elements
+    teamAInput: document.getElementById('team-a-name'),
+    teamBInput: document.getElementById('team-b-name'),
+    lblTossA: document.getElementById('lbl-toss-a'),
+    lblTossB: document.getElementById('lbl-toss-b'),
+    tossWinnerRadios: document.getElementsByName('toss-winner'),
+    tossDecisionRadios: document.getElementsByName('toss-decision'),
+    squadAContainer: document.getElementById('team-a-squad'),
+    squadBContainer: document.getElementById('team-b-squad'),
+    btnAddPlayerA: document.getElementById('btn-add-player-a'),
+    btnAddPlayerB: document.getElementById('btn-add-player-b'),
+    selectStriker: document.getElementById('setup-striker'),
+    selectNonStriker: document.getElementById('setup-nonstriker'),
+    selectBowler: document.getElementById('setup-bowler'),
+
+    // In-game Selection Modal
+    selectionModal: document.getElementById('selection-modal'),
+    selectionTitle: document.getElementById('selection-title'),
+    selectionDropdown: document.getElementById('selection-dropdown'),
+    btnConfirmSelection: document.getElementById('btn-confirm-selection'),
+
+    // Result Modal
+    resultModal: document.getElementById('result-modal'),
+    resultText: document.getElementById('result-text'),
+    resultSubtext: document.getElementById('result-subtext'),
+
+    // Target Modal
+    targetModal: document.getElementById('target-modal'),
+    targetScoreDisplay: document.getElementById('target-score-display'),
+    targetEquationDisplay: document.getElementById('target-equation-display'),
+    btnStartSecondInnings: document.getElementById('btn-start-second-innings'),
+
+    // Scorecard Tabs
+    tabInning1: document.getElementById('tab-inning-1'),
+    tabInning2: document.getElementById('tab-inning-2'),
+
+    // UI Elements
+    title: document.getElementById('ui-match-title'),
+    tossInfo: document.getElementById('ui-toss-info'),
+    batTeamBadge: document.getElementById('ui-bat-team-badge'),
+    bowlTeamBadge: document.getElementById('ui-bowl-team-badge'),
+    targetBadge: document.getElementById('ui-target-badge'),
+    score: document.getElementById('current-score'),
+    overs: document.getElementById('current-overs'),
+    equation: document.getElementById('match-equation'),
+    crr: document.getElementById('crr'),
+    req: document.getElementById('req'),
+    reqContainer: document.getElementById('req-container'),
+    recentBalls: document.getElementById('recent-balls'),
+    matchEvents: document.getElementById('match-events'),
+    battersList: document.getElementById('batters-list'),
+    bowlersList: document.getElementById('bowlers-list'),
+    btnUndo: document.getElementById('btn-undo'),
+    fullBattingCard: document.getElementById('full-batting-card'),
+    fullBowlingCard: document.getElementById('full-bowling-card')
+};
+
+// Dynamic Setup Interactions
+els.teamAInput.addEventListener('input', (e) => els.lblTossA.textContent = e.target.value || "Team A");
+els.teamBInput.addEventListener('input', (e) => els.lblTossB.textContent = e.target.value || "Team B");
+
+function createPlayerInput(team) {
+    const input = document.createElement('input');
+    const currentCount = document.querySelectorAll(`.squad-input-${team}`).length + 1;
+    input.type = 'text';
+    input.placeholder = `Player ${currentCount}`;
+    input.className = `squad-input-${team} w-full bg-cricDark border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-cricNeon${team === 'a' ? 'Blue' : 'Green'}`;
+    return input;
+}
+
+els.btnAddPlayerA.addEventListener('click', () => {
+    const input = createPlayerInput('a');
+    els.squadAContainer.appendChild(input);
+    try {
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+        input.scrollIntoView();
+    }
+    populateSetupDropdowns();
+});
+els.btnAddPlayerB.addEventListener('click', () => {
+    const input = createPlayerInput('b');
+    els.squadBContainer.appendChild(input);
+    try {
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+        input.scrollIntoView();
+    }
+    populateSetupDropdowns();
+});
+
+// Auto-Populate dropdowns function
+function populateSetupDropdowns() {
+    const teamA = els.teamAInput.value || "Team A";
+    const teamB = els.teamBInput.value || "Team B";
+    
+    let tossWinner = 'A';
+    for (const radio of els.tossWinnerRadios) if (radio.checked) tossWinner = radio.value;
+    
+    let tossDecision = 'bat';
+    for (const radio of els.tossDecisionRadios) if (radio.checked) tossDecision = radio.value;
+
+    let batSquadInputs, bowlSquadInputs;
+
+    if ((tossWinner === 'A' && tossDecision === 'bat') || (tossWinner === 'B' && tossDecision === 'bowl')) {
+        batSquadInputs = document.querySelectorAll('.squad-input-a');
+        bowlSquadInputs = document.querySelectorAll('.squad-input-b');
+    } else {
+        batSquadInputs = document.querySelectorAll('.squad-input-b');
+        bowlSquadInputs = document.querySelectorAll('.squad-input-a');
+    }
+
+    const batSquad = Array.from(batSquadInputs).map(i => i.value.trim() || i.placeholder).filter(v => v);
+    const bowlSquad = Array.from(bowlSquadInputs).map(i => i.value.trim() || i.placeholder).filter(v => v);
+
+    const currentStriker = els.selectStriker.value;
+    const currentNonStriker = els.selectNonStriker.value;
+    const currentBowler = els.selectBowler.value;
+
+    function fillSelect(selectElement, optionsList, defaultText, currentValue, excludeVal = null) {
+        selectElement.innerHTML = `<option value="" disabled ${!currentValue ? 'selected' : ''}>${defaultText}</option>`;
+        optionsList.forEach(opt => {
+            if (opt === excludeVal) return; // Exclude logic
+            const el = document.createElement('option');
+            el.value = opt;
+            el.textContent = opt;
+            if (opt === currentValue) el.selected = true;
+            selectElement.appendChild(el);
+        });
+    }
+
+    fillSelect(els.selectStriker, batSquad, "Select Striker", currentStriker, currentNonStriker);
+    fillSelect(els.selectNonStriker, batSquad, "Select Non-Striker", currentNonStriker, currentStriker);
+    fillSelect(els.selectBowler, bowlSquad, "Select Bowler", currentBowler);
+}
+
+// Auto-refresh when any setup input changes
+document.addEventListener('input', (e) => {
+    if (e.target.classList.contains('squad-input-a') || e.target.classList.contains('squad-input-b') || 
+        e.target.classList.contains('team-name-input') || e.target.type === 'radio') {
+        populateSetupDropdowns();
+    }
+});
+els.selectStriker.addEventListener('change', populateSetupDropdowns);
+els.selectNonStriker.addEventListener('change', populateSetupDropdowns);
+
+// Initialize initial 3 players on load safely
+function initPlayers() {
+    if (document.querySelectorAll('.squad-input-a').length === 0) {
+        for (let i = 0; i < 3; i++) {
+            els.squadAContainer.appendChild(createPlayerInput('a'));
+            els.squadBContainer.appendChild(createPlayerInput('b'));
+        }
+        populateSetupDropdowns();
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPlayers);
+} else {
+    initPlayers();
+}
+
+// Match Setup Logic
+els.form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    // Process Teams and Toss
+    const teamA = els.teamAInput.value;
+    const teamB = els.teamBInput.value;
+    
+    let tossWinner = 'A';
+    for (const radio of els.tossWinnerRadios) if (radio.checked) tossWinner = radio.value;
+    
+    let tossDecision = 'bat';
+    for (const radio of els.tossDecisionRadios) if (radio.checked) tossDecision = radio.value;
+
+    const tossWinningTeamName = tossWinner === 'A' ? teamA : teamB;
+    const tossString = `${tossWinningTeamName} won the toss and elected to ${tossDecision}`;
+
+    let batTeam, bowlTeam, batSquadInputs, bowlSquadInputs;
+
+    if ((tossWinner === 'A' && tossDecision === 'bat') || (tossWinner === 'B' && tossDecision === 'bowl')) {
+        batTeam = teamA;
+        bowlTeam = teamB;
+        batSquadInputs = document.querySelectorAll('.squad-input-a');
+        bowlSquadInputs = document.querySelectorAll('.squad-input-b');
+    } else {
+        batTeam = teamB;
+        bowlTeam = teamA;
+        batSquadInputs = document.querySelectorAll('.squad-input-b');
+        bowlSquadInputs = document.querySelectorAll('.squad-input-a');
+    }
+
+    const batSquad = Array.from(batSquadInputs).map(i => i.value.trim() || i.placeholder).filter(v => v);
+    const bowlSquad = Array.from(bowlSquadInputs).map(i => i.value.trim() || i.placeholder).filter(v => v);
+
+    const strikerName = els.selectStriker.value;
+    const nonStrikerName = els.selectNonStriker.value;
+    const bowlerName = els.selectBowler.value;
+
+    if (!strikerName || !nonStrikerName || !bowlerName) {
+        alert("Please select opening players from the dropdowns!");
+        return;
+    }
+
+    matchState = {
+        title: document.getElementById('setup-title').value,
+        tossString: tossString,
+        batTeam: batTeam,
+        bowlTeam: bowlTeam,
+        batSquad: batSquad,
+        bowlSquad: bowlSquad,
+        target: 0,
+        totalBalls: parseInt(document.getElementById('setup-overs').value) * 6,
+        currentInnings: {
+            runs: 0,
+            wickets: 0,
+            balls: 0,
+            outBatters: [],
+            battingCard: {},
+            bowlingCard: {}
+        },
+        firstInningsData: null,
+        batters: [
+            { id: Date.now(), name: strikerName, runs: 0, balls: 0, isStriker: true },
+            { id: Date.now()+1, name: nonStrikerName, runs: 0, balls: 0, isStriker: false }
+        ],
+        bowler: { name: bowlerName, runs: 0, wickets: 0, balls: 0 },
+        history: []
+    };
+
+    activeScorecardTab = 1;
+    isProcessingBall = false; // Reset lock for new match
+    els.tabInning2.classList.add('opacity-50', 'cursor-not-allowed');
+    els.tabInning2.disabled = true;
+    switchTab(1); // Set tab styles
+
+    // Initialize Card entries
+    matchState.currentInnings.battingCard[strikerName] = { runs: 0, balls: 0, fours: 0, sixes: 0, outStatus: 'not out' };
+    matchState.currentInnings.battingCard[nonStrikerName] = { runs: 0, balls: 0, fours: 0, sixes: 0, outStatus: 'not out' };
+    matchState.currentInnings.bowlingCard[bowlerName] = { runs: 0, wickets: 0, balls: 0, maidens: 0 };
+
+    els.modal.classList.add('hidden');
+    els.matchEvents.innerHTML = ''; // Clear events
+    updateUI();
+});
+
+if (els.btnNewMatch) {
+    els.btnNewMatch.addEventListener('click', (e) => {
+        e.preventDefault();
+        els.modal.classList.remove('hidden');
+    });
+}
+
+// Scorecard Tab Switching
+function switchTab(tabNum) {
+    activeScorecardTab = tabNum;
+    if (tabNum === 1) {
+        els.tabInning1.classList.replace('text-gray-500', 'text-white');
+        els.tabInning1.classList.add('bg-white/10');
+        els.tabInning2.classList.replace('text-white', 'text-gray-500');
+        els.tabInning2.classList.remove('bg-white/10');
+    } else {
+        els.tabInning2.classList.replace('text-gray-500', 'text-white');
+        els.tabInning2.classList.add('bg-white/10');
+        els.tabInning1.classList.replace('text-white', 'text-gray-500');
+        els.tabInning1.classList.remove('bg-white/10');
+    }
+    updateUI();
+}
+
+els.tabInning1.addEventListener('click', () => switchTab(1));
+els.tabInning2.addEventListener('click', () => switchTab(2));
+
+
+// Utility Functions
+function getOversString(balls) {
+    const overs = Math.floor(balls / 6);
+    const remainder = balls % 6;
+    return `${overs}.${remainder}`;
+}
+
+function getStrikeRate(runs, balls) {
+    if (balls === 0) return "0.0";
+    return ((runs / balls) * 100).toFixed(1);
+}
+
+function getEconomy(runs, balls) {
+    if (balls === 0) return "0.0";
+    return (runs / (balls / 6)).toFixed(1);
+}
+
+function triggerFireworks() {
+    var duration = 3 * 1000;
+    var animationEnd = Date.now() + duration;
+    var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 300 };
+
+    function randomInRange(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    var interval = setInterval(function() {
+      var timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      var particleCount = 50 * (timeLeft / duration);
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
+}
+
+// Custom Modal Selection
+function requestPlayerSelection(title, squadArray, excludeList = []) {
+    return new Promise((resolve) => {
+        els.selectionTitle.textContent = title;
+        
+        const activePlayers = matchState.batters.map(b => b.name).concat([matchState.bowler?.name]);
+        const outPlayers = matchState.currentInnings.outBatters || [];
+        const allExcluded = [...activePlayers, ...outPlayers, ...excludeList];
+        
+        const availableOptions = squadArray.filter(p => !allExcluded.includes(p));
+        const optionsToUse = availableOptions.length > 0 ? availableOptions : ["Sub / Unknown Player"];
+
+        els.selectionDropdown.innerHTML = '';
+        
+        // Force the user to open the dropdown by adding a disabled placeholder
+        const placeholder = document.createElement('option');
+        placeholder.value = "";
+        placeholder.textContent = "-- Select Player --";
+        placeholder.disabled = true;
+        placeholder.selected = true;
+        els.selectionDropdown.appendChild(placeholder);
+
+        optionsToUse.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            els.selectionDropdown.appendChild(opt);
+        });
+
+        els.selectionModal.classList.remove('hidden');
+
+        const newBtn = els.btnConfirmSelection.cloneNode(true);
+        els.btnConfirmSelection.replaceWith(newBtn);
+        els.btnConfirmSelection = newBtn;
+
+        els.btnConfirmSelection.addEventListener('click', () => {
+            const val = els.selectionDropdown.value;
+            if (!val) {
+                alert("Please select a player from the dropdown list!");
+                return;
+            }
+            els.selectionModal.classList.add('hidden');
+            resolve(val);
+        });
+    });
+}
+
+// Update UI
+function updateUI() {
+    if (!matchState.title) return; // Not initialized
+
+    const s = matchState.currentInnings;
+    
+    // Headers & Teams
+    els.title.textContent = matchState.title;
+    els.tossInfo.textContent = matchState.tossString;
+    els.batTeamBadge.innerHTML = `${matchState.batTeam} <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-cricNeonGreen rounded-full border-2 border-cricCard"></div>`;
+    els.bowlTeamBadge.textContent = matchState.bowlTeam;
+    
+    els.score.textContent = `${s.runs}/${s.wickets}`;
+    els.overs.textContent = `${getOversString(s.balls)} overs`;
+    
+    // Equation
+    const runsNeeded = matchState.target > 0 ? matchState.target - s.runs : null;
+    const ballsRemaining = matchState.totalBalls - s.balls;
+    
+    if (matchState.target > 0) {
+        els.targetBadge.textContent = `Target ${matchState.target}`;
+        if (runsNeeded <= 0) {
+            els.equation.textContent = `${matchState.batTeam} won the match!`;
+        } else if (ballsRemaining <= 0) {
+            els.equation.textContent = `${matchState.bowlTeam} won the match!`;
+        } else {
+            els.equation.textContent = `${matchState.batTeam} needs ${runsNeeded} runs in ${ballsRemaining} balls`;
+        }
+        els.reqContainer.classList.remove('hidden');
+    } else {
+        els.targetBadge.textContent = `1st Innings`;
+        els.equation.textContent = `Projected Score: ${Math.floor((s.balls === 0 ? 0 : (s.runs / s.balls)) * matchState.totalBalls)}`;
+        els.reqContainer.classList.add('hidden');
+    }
+    
+    // Rates
+    const crr = s.balls === 0 ? 0 : (s.runs / (s.balls / 6));
+    els.crr.textContent = crr.toFixed(2);
+    
+    if (matchState.target > 0) {
+        const req = ballsRemaining === 0 ? 0 : (runsNeeded / (ballsRemaining / 6));
+        els.req.textContent = req.toFixed(2);
+    }
+    
+    // Batters
+    els.battersList.innerHTML = matchState.batters.map(b => `
+        <div class="flex justify-between items-center p-2 rounded-lg ${b.isStriker ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5 transition-colors'}">
+            <div class="flex items-center gap-2">
+                ${b.isStriker ? '<i data-lucide="bat-sword" class="w-4 h-4 text-cricNeonGreen"></i>' : '<span class="w-4"></span>'}
+                <span class="font-medium ${b.isStriker ? 'text-white' : 'text-gray-300'}">${b.name}${b.isStriker ? '*' : ''}</span>
+            </div>
+            <div class="text-sm font-mono text-gray-300">
+                <span class="${b.isStriker ? 'text-white' : 'text-gray-100'} font-bold w-6 inline-block text-right">${b.runs}</span> (${b.balls}) <span class="text-xs text-gray-500">${getStrikeRate(b.runs, b.balls)}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    // Bowler
+    const bwl = matchState.bowler;
+    els.bowlersList.innerHTML = `
+        <div class="flex justify-between items-center p-2 rounded-lg bg-white/5 border border-white/10">
+            <div class="flex items-center gap-2">
+                <i data-lucide="circle-dot" class="w-4 h-4 text-cricNeonBlue"></i>
+                <span class="font-medium text-white">${bwl.name}*</span>
+            </div>
+            <div class="text-sm font-mono text-gray-300">
+                <span class="font-medium">${getOversString(bwl.balls)}</span>-0-${bwl.runs}-${bwl.wickets} <span class="text-xs text-gray-500">${getEconomy(bwl.runs, bwl.balls)}</span>
+            </div>
+        </div>
+    `;
+
+    // Render Tabbed Scorecard Data
+    let displayBattingCard = {};
+    let displayBowlingCard = {};
+
+    if (activeScorecardTab === 1) {
+        if (matchState.target > 0 && matchState.firstInningsData) {
+            // Viewing 1st innings while in 2nd innings
+            displayBattingCard = matchState.firstInningsData.battingCard;
+            displayBowlingCard = matchState.firstInningsData.bowlingCard;
+        } else {
+            // Viewing 1st innings while in 1st innings
+            displayBattingCard = s.battingCard;
+            displayBowlingCard = s.bowlingCard;
+        }
+    } else {
+        // Viewing 2nd innings
+        displayBattingCard = s.battingCard;
+        displayBowlingCard = s.bowlingCard;
+    }
+
+    els.fullBattingCard.innerHTML = Object.keys(displayBattingCard).map(name => {
+        const p = displayBattingCard[name];
+        return `
+        <tr>
+            <td class="py-2">
+                <div class="font-medium text-white">${name}</div>
+                <div class="text-xs text-gray-500">${p.outStatus}</div>
+            </td>
+            <td class="py-2 text-center font-bold text-white">${p.runs}</td>
+            <td class="py-2 text-center">${p.balls}</td>
+            <td class="py-2 text-center">${p.fours}</td>
+            <td class="py-2 text-center">${p.sixes}</td>
+            <td class="py-2 text-right">${getStrikeRate(p.runs, p.balls)}</td>
+        </tr>`;
+    }).join('');
+
+    els.fullBowlingCard.innerHTML = Object.keys(displayBowlingCard).map(name => {
+        const p = displayBowlingCard[name];
+        return `
+        <tr>
+            <td class="py-2 font-medium text-white">${name}</td>
+            <td class="py-2 text-center">${getOversString(p.balls)}</td>
+            <td class="py-2 text-center">${p.maidens}</td>
+            <td class="py-2 text-center">${p.runs}</td>
+            <td class="py-2 text-center font-bold text-white">${p.wickets}</td>
+            <td class="py-2 text-right">${getEconomy(p.runs, p.balls)}</td>
+        </tr>`;
+    }).join('');
+
+    // Re-initialize icons for new elements
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+    renderRecentBalls();
+}
+
+function renderRecentBalls() {
+    // Show last 12 balls to ensure we see the full current over (even with extras) and part of the previous over
+    const recent = matchState.history.slice(-12);
+    
+    let html = '';
+    let lastOverIndex = -1;
+
+    recent.forEach(b => {
+        // Find out which over this ball belongs to
+        // b.previousState.currentInnings.balls is the legal ball count before this ball was bowled
+        const prevBalls = b.previousState.currentInnings.balls;
+        const currentOverIndex = Math.floor(prevBalls / 6);
+
+        // If the over index changed, insert a divider (except before the very first ball)
+        if (lastOverIndex !== -1 && currentOverIndex !== lastOverIndex) {
+            html += `<div class="w-1 h-6 bg-white/20 rounded mx-1"></div>`;
+        }
+        lastOverIndex = currentOverIndex;
+
+        let badgeClass = 'ball-run';
+        let text = b.runs;
+        
+        if (b.isWicket) { badgeClass = 'ball-wicket'; text = 'W'; }
+        else if (b.extra) { badgeClass = 'ball-extra'; text = b.runs + b.extra[0].toUpperCase(); }
+        else if (b.runs === 0) { badgeClass = 'ball-dot'; text = '0'; }
+        else if (b.runs === 4) { badgeClass = 'ball-four'; }
+        else if (b.runs === 6) { badgeClass = 'ball-six'; }
+        
+        html += `<div class="ball-badge ${badgeClass}">${text}</div>`;
+    });
+
+    els.recentBalls.innerHTML = html;
+}
+
+function addMatchEvent(text, isImportant, bowlerName, strikerName) {
+    const s = matchState.currentInnings;
+    const overStr = getOversString(s.balls);
+    
+    const div = document.createElement('div');
+    div.className = `event-item flex gap-3 text-sm p-2 rounded-lg border-l-2 ${isImportant ? 'bg-white/5 border-cricNeonBlue' : 'border-white/10 text-gray-300'}`;
+    div.innerHTML = `
+        <span class="font-mono text-gray-500 w-10 shrink-0">${overStr}</span>
+        <span><strong class="${isImportant ? 'text-white' : ''}">${bowlerName} to ${strikerName},</strong> ${text}</span>
+    `;
+    
+    els.matchEvents.prepend(div);
+}
+
+// Logic Actions
+function rotateStrike() {
+    matchState.batters.forEach(b => b.isStriker = !b.isStriker);
+}
+
+async function startSecondInnings() {
+    matchState.target = matchState.currentInnings.runs + 1;
+    
+    // Show big target modal and wait for user to click Start 2nd Innings
+    await new Promise((resolve) => {
+        els.targetScoreDisplay.textContent = matchState.target;
+        els.targetEquationDisplay.textContent = `${matchState.bowlTeam} needs ${matchState.target} runs in ${matchState.totalBalls} balls to win`;
+        
+        els.targetModal.classList.remove('hidden');
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        
+        const newBtn = els.btnStartSecondInnings.cloneNode(true);
+        els.btnStartSecondInnings.replaceWith(newBtn);
+        els.btnStartSecondInnings = newBtn;
+        
+        els.btnStartSecondInnings.addEventListener('click', () => {
+            els.targetModal.classList.add('hidden');
+            resolve();
+        });
+    });
+    
+    // Save 1st innings data for scorecard tabs
+    matchState.firstInningsData = {
+        battingCard: { ...matchState.currentInnings.battingCard },
+        bowlingCard: { ...matchState.currentInnings.bowlingCard }
+    };
+    
+    // Enable 2nd innings tab and switch to it
+    els.tabInning2.classList.remove('opacity-50', 'cursor-not-allowed');
+    els.tabInning2.disabled = false;
+    switchTab(2);
+    
+    // Swap teams
+    const tempBatTeam = matchState.batTeam;
+    matchState.batTeam = matchState.bowlTeam;
+    matchState.bowlTeam = tempBatTeam;
+    
+    const tempBatSquad = matchState.batSquad;
+    matchState.batSquad = matchState.bowlSquad;
+    matchState.bowlSquad = tempBatSquad;
+    
+    // Reset innings state
+    matchState.currentInnings = {
+        runs: 0, wickets: 0, balls: 0, outBatters: [], battingCard: {}, bowlingCard: {}
+    };
+    
+    // Clear active players from 1st innings so they don't get excluded in the dropdown
+    matchState.batters = [];
+    matchState.bowler = null;
+    
+    // Prompt for new players
+    const strikerName = await requestPlayerSelection("2nd Innings: Select Striker", matchState.batSquad);
+    const nonStrikerName = await requestPlayerSelection("2nd Innings: Select Non-Striker", matchState.batSquad, [strikerName]);
+    const bowlerName = await requestPlayerSelection("2nd Innings: Select Opening Bowler", matchState.bowlSquad);
+    
+    matchState.batters = [
+        { id: Date.now(), name: strikerName, runs: 0, balls: 0, isStriker: true },
+        { id: Date.now()+1, name: nonStrikerName, runs: 0, balls: 0, isStriker: false }
+    ];
+    matchState.bowler = { name: bowlerName, runs: 0, wickets: 0, balls: 0 };
+    matchState.history = []; 
+
+    // Init cards for 2nd innings
+    matchState.currentInnings.battingCard[strikerName] = { runs: 0, balls: 0, fours: 0, sixes: 0, outStatus: 'not out' };
+    matchState.currentInnings.battingCard[nonStrikerName] = { runs: 0, balls: 0, fours: 0, sixes: 0, outStatus: 'not out' };
+    matchState.currentInnings.bowlingCard[bowlerName] = { runs: 0, wickets: 0, balls: 0, maidens: 0 };
+    
+    els.matchEvents.innerHTML = '';
+    
+    const div = document.createElement('div');
+    div.className = `event-item flex gap-3 text-sm p-2 rounded-lg bg-cricNeonBlue/10 border-l-4 border-cricNeonBlue text-white font-bold my-4`;
+    div.innerHTML = `SECOND INNINGS BEGINS - Target: ${matchState.target}`;
+    els.matchEvents.prepend(div);
+    
+    updateUI();
+    isProcessingBall = false;
+}
+
+function handleMatchOver() {
+    const s = matchState.currentInnings;
+    const maxWickets = Math.min(10, Math.max(1, matchState.batSquad.length - 1));
+    
+    let resultStr = "";
+    let subText = "";
+
+    if (s.runs >= matchState.target) {
+        resultStr = `${matchState.batTeam} Won!`;
+        subText = `by ${maxWickets - s.wickets} wickets`;
+    } else if (s.runs === matchState.target - 1) {
+        resultStr = `Match Tied!`;
+        subText = `Scores are level at ${s.runs}`;
+    } else {
+        resultStr = `${matchState.bowlTeam} Won!`;
+        subText = `by ${matchState.target - s.runs - 1} runs`;
+    }
+
+    els.resultText.textContent = resultStr;
+    els.resultSubtext.textContent = subText;
+    els.resultModal.classList.remove('hidden');
+    triggerFireworks();
+}
+
+async function scoreBall(runs, extra = null, isWicket = false) {
+    if (!matchState.title) return alert("Please setup the match first!");
+    if (isProcessingBall) return;
+    
+    isProcessingBall = true;
+    let lockPermanently = false;
+
+    try {
+        const s = matchState.currentInnings;
+        
+        // Dynamic max wickets calculation based on squad size (minimum 1, maximum 10)
+        // If squad has 11 players, 10 wickets fall. If squad has 5 players, 4 wickets fall.
+        const maxWickets = Math.min(10, Math.max(1, matchState.batSquad.length - 1));
+
+        if (s.wickets >= maxWickets || s.balls >= matchState.totalBalls || (matchState.target > 0 && s.runs >= matchState.target)) {
+            lockPermanently = true;
+            if (matchState.target === 0) {
+                setTimeout(startSecondInnings, 500);
+            } else {
+                handleMatchOver();
+            }
+            return;
+        }
+
+        const bwl = matchState.bowler;
+        const striker = matchState.batters.find(b => b.isStriker);
+        const currentBowlerName = bwl.name;
+        const currentStrikerName = striker.name;
+
+        // Save to history for undo (Deep clone simple state)
+        const eventState = JSON.parse(JSON.stringify(matchState));
+
+        let ballIsLegal = true;
+        if (extra === 'wide' || extra === 'noball') {
+            ballIsLegal = false;
+            s.runs += 1; 
+            bwl.runs += 1;
+            s.bowlingCard[currentBowlerName].runs += 1;
+        }
+
+        if (ballIsLegal) {
+            s.balls += 1;
+            bwl.balls += 1;
+            striker.balls += 1;
+            
+            s.bowlingCard[currentBowlerName].balls += 1;
+            s.battingCard[currentStrikerName].balls += 1;
+        }
+
+        s.runs += runs;
+        bwl.runs += runs;
+        s.bowlingCard[currentBowlerName].runs += runs;
+        
+        if (extra !== 'wide' && extra !== 'legbye' && extra !== 'bye') {
+            striker.runs += runs;
+            s.battingCard[currentStrikerName].runs += runs;
+            
+            if (runs === 4) s.battingCard[currentStrikerName].fours += 1;
+            if (runs === 6) s.battingCard[currentStrikerName].sixes += 1;
+        }
+
+        let eventText = `${runs} run${runs !== 1 ? 's' : ''}`;
+        let isImportant = false;
+
+        if (runs === 4) { eventText = 'FOUR runs! Beautiful shot.'; isImportant = true; }
+        if (runs === 6) { eventText = 'SIX runs! Huge hit into the stands!'; isImportant = true; }
+        if (runs === 0) { eventText = 'no run.'; }
+
+        if (extra) {
+            eventText = `${runs} runs (${extra})`;
+        }
+
+        // Flag to ensure updateUI is called exactly once per scoreBall cycle
+        let requiresAsyncPlayerSelection = false;
+        let overFinished = false;
+
+        if (isWicket) {
+            s.wickets += 1;
+            bwl.wickets += 1;
+            s.bowlingCard[currentBowlerName].wickets += 1;
+            
+            eventText = 'OUT! Wicket falls!';
+            isImportant = true;
+            
+            s.outBatters.push(striker.name);
+            s.battingCard[currentStrikerName].outStatus = `b ${currentBowlerName}`; 
+            
+            // Check if all out
+            if (s.wickets >= maxWickets) {
+                eventText += " | All Out!";
+            } else {
+                requiresAsyncPlayerSelection = true;
+            }
+        } else {
+            // Strike rotation on 1, 3 runs (legal or legbye/bye)
+            if (!extra || extra === 'legbye' || extra === 'bye' || extra === 'noball') {
+                 if (runs % 2 !== 0) rotateStrike();
+            }
+        }
+
+        // Over completion
+        if (ballIsLegal && s.balls > 0 && s.balls % 6 === 0) {
+            overFinished = true;
+            rotateStrike();
+            eventText += ` | End of Over ${s.balls / 6}`;
+            isImportant = true;
+        }
+
+        // Record History
+        matchState.history.push({
+            type: 'ball',
+            runs,
+            extra,
+            isWicket,
+            ballNumber: s.balls,
+            previousState: eventState
+        });
+
+        addMatchEvent(eventText, isImportant, currentBowlerName, currentStrikerName);
+        
+        // Preliminary UI Update before any modal
+        updateUI(); 
+
+        // Handle Async Wicket Batsman Selection
+        if (requiresAsyncPlayerSelection) {
+            const newBatterName = await requestPlayerSelection("Select New Batsman", matchState.batSquad);
+            striker.runs = 0;
+            striker.balls = 0;
+            striker.name = newBatterName;
+            s.battingCard[newBatterName] = { runs: 0, balls: 0, fours: 0, sixes: 0, outStatus: 'not out' };
+            updateUI(); // crucial update to refresh stats with the newly selected player!
+        }
+
+        // Trigger innings transitions or new bowler selection
+        if (s.wickets >= maxWickets || s.balls >= matchState.totalBalls || (matchState.target > 0 && s.runs >= matchState.target)) {
+            lockPermanently = true;
+            if (matchState.target === 0) {
+                setTimeout(startSecondInnings, 500); 
+            } else {
+                setTimeout(handleMatchOver, 500);
+            }
+            return;
+        } else if (overFinished) {
+            const newBowler = await requestPlayerSelection("Select Next Bowler", matchState.bowlSquad);
+            matchState.bowler = { name: newBowler, runs: 0, wickets: 0, balls: 0 };
+            
+            if (!s.bowlingCard[newBowler]) {
+                s.bowlingCard[newBowler] = { runs: 0, wickets: 0, balls: 0, maidens: 0 };
+            }
+            updateUI(); // crucial update to refresh stats with the newly selected bowler!
+        }
+    } catch (err) {
+        console.error("Error processing ball:", err);
+    } finally {
+        if (!lockPermanently) {
+            isProcessingBall = false;
+        }
+    }
+}
+
+function undoLastBall() {
+    if (matchState.history.length === 0 || isProcessingBall) return;
+    
+    const lastEvent = matchState.history.pop();
+    if (lastEvent.previousState) {
+        matchState = lastEvent.previousState;
+        els.matchEvents.removeChild(els.matchEvents.firstElementChild); // Remove event log
+        updateUI();
+    }
+}
+
+// Event Listeners
+document.querySelectorAll('.score-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const runs = parseInt(e.currentTarget.dataset.runs);
+        scoreBall(runs);
+    });
+});
+
+document.querySelectorAll('.extra-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const extra = e.currentTarget.dataset.extra;
+        scoreBall(0, extra);
+    });
+});
+
+document.querySelector('[data-wicket="true"]').addEventListener('click', () => {
+    scoreBall(0, null, true);
+});
+
+els.btnUndo.addEventListener('click', undoLastBall);
+
+</script>
 </body>
 </html>
+
